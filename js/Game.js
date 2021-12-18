@@ -5,6 +5,8 @@ class Game {
     this.leaderBoardTitle = createElement("h2");
     this.leader1 = createElement("h2");
     this.leader2 = createElement("h2");
+    this.leftKeyActive = false;
+    this.playerMoving = false;
   }
   getState(){
     var gameStateref = database.ref("gameState")
@@ -25,11 +27,15 @@ class Game {
 
     car1 = createSprite(width/2-50,height-100);
     car1.addImage("car1",car1_img);
+    car1.addImage("blast",blast);
     car1.scale = 0.07
 
     car2 = createSprite(width/2 + 100,height-100);
     car2.addImage("car2",car2_img);
+    car2.addImage("blast",blast);
     car2.scale = 0.07
+
+
 
     cars = [car1,car2];
     obstaclesPositions = [
@@ -87,6 +93,11 @@ class Game {
         //Use data from the database to display the cars in x and y direction
         var x = allPlayers[plr].positionx
         var y = height-allPlayers[plr].positiony
+        var currentLife = allPlayers[plr].life
+        if(currentLife <= 0){
+          cars[index-1].changeImage("blast");
+          cars[index-1].scale = 0.3;
+        }
         cars[index-1].position.x = x;
         cars[index-1].position.y = y;
         if(index === player.index){
@@ -96,7 +107,21 @@ class Game {
           this.handleFuel(index)
           this.handlePowerCoins(index)
           this.handleObstacles(index)
-          
+          this.handleCarCollision(index);
+          if(player.fuel > 0){
+          this.decreaseFuel();
+          }
+
+          else{
+            swal({
+              title:  `Out Of Fuel!`,
+              text: "You ran out of fuel!",
+              imageUrl: "https://thumbs.dreamstime.com/b/empty-gas-tank-illustration-18241072.jpg" ,
+              imageSize: "100x100",
+              confirmButtonText: "I accept defeat. :("
+          })
+          gameState = 2
+        }
 
           //changing camera position in Y direction
           //camera.position.x = cars[index-1].position.x
@@ -179,18 +204,23 @@ class Game {
     })
   }
   handlePlayercontrols(){
-    if(keyIsDown(UP_ARROW)){
-      player.positiony += 10;
-      player.update();
+    if(player.life > 0){
+      if(keyIsDown(UP_ARROW)){
+        player.positiony += 10;
+        player.update();
+      }
+      if(keyIsDown(LEFT_ARROW) && player.positionx > width/3 - 50 ){
+        this.leftKeyActive = true;
+        player.positionx -= 5;
+        player.update();
+      }
+      if(keyIsDown(RIGHT_ARROW) && player.positionx < width/2 + 300){
+        this.leftKeyActive = false;
+        player.positionx += 5;
+        player.update();
+      }
     }
-    if(keyIsDown(LEFT_ARROW) && player.positionx > width/3 - 50 ){
-      player.positionx -= 5;
-      player.update();
-    }
-    if(keyIsDown(RIGHT_ARROW) && player.positionx < width/2 + 300){
-      player.positionx += 5;
-      player.update();
-    }
+   
   }
 
   addSprites(spriteGrp, NumberOfSprites, spriteImg, scale, positions = []){
@@ -241,14 +271,10 @@ class Game {
     })
   }
   handleObstacles(index){
-    cars[index-1].overlap(obstacles,function(collector,collected){
+    if(cars[index-1].collide(obstacles)){
       if(player.life > 123){
       player.life = player.life - 62
-      player.update();
-      collected.remove();
-      player.fuel = player.fuel - 10;
-    
-    }
+      }
       else{
         player.life = 0;
         swal({
@@ -258,11 +284,49 @@ class Game {
           imageSize: "100x100",
           confirmButtonText: "Okay", 
          })
-         collector.destroy();
+         
          
       }
-    })
+      if(this.leftKeyActive){
+        player.positionx += 100;
+      }
+      else{
+        player.positionx -= 100;
+      }
+      player.update();
+    }
   }
+  handleCarCollision(index){
+    if(index === 1){
+      if(cars[index-1].collide(cars[1])){
+        if(player.life > 0){
+          player.life -= 62;
+        }
+        if(this.leftKeyActive){
+          player.positionx += 100;
+        }
+        else{
+          player.positionx -= 100;
+        }
+        player.update();
+      }
+    }
+    if(index === 2){
+      if(cars[index-1].collide(cars[0])){
+        if(player.life > 0){
+          player.life -= 62;
+        }
+        if(this.leftKeyActive){
+          player.positionx += 100;
+        }
+        else{
+          player.positionx -= 100;
+        }
+        player.update();
+      }
+    }
+  }
+
   showRank(){
     swal({
      title:  `Awesome!${"\n"}Rank${"\n"}${player.rank}`,
@@ -273,6 +337,11 @@ class Game {
 
 
     })
+  }
+  decreaseFuel(){
+    if(player.positiony % 300 === 0 && player.positiony > 0 ){
+      player.fuel = player.fuel - 3;
+    }
   }
   showLife(){
     push();
